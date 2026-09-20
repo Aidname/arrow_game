@@ -12,6 +12,7 @@ BLACK = (0, 0, 0)
 RED = (200, 30, 30)
 GREEN = (30, 180, 60)
 BLUE = (30, 80, 200)
+ORANGE = (255, 140, 0)
 CELL_SIZE = 80
 MARGIN = 10
 # 方向字符和向量
@@ -77,7 +78,8 @@ class Game:
         self.anim_timer = 0
         self.anim_type = None  # fly / bump
         self.anim_target = None
-        self.restart_rect = pygame.Rect(520, 8, 140, 36) # 重新开始按钮矩形
+        self.restart_rect = pygame.Rect(520, 8, 140, 36)
+        self.restart_pressed = False  # 按钮按下状态
         self.offset_x = 0
         self.offset_y = 0
 
@@ -141,10 +143,16 @@ class Game:
         self.screen.blit(info1, (20, 10))
         self.screen.blit(info2, (160, 10))
         self.screen.blit(info3, (320, 10))
-        # 重新开始按钮
-        pygame.draw.rect(self.screen, GRAY, self.restart_rect, border_radius=6)
+
+        # 绘制重新开始按钮，根据状态变色
+        if self.restart_pressed:
+            restart_color = ORANGE
+        else:
+            restart_color = GREEN
+        pygame.draw.rect(self.screen, restart_color, self.restart_rect, border_radius=6)
         restart_text = self.font_small.render("重新开始", True, WHITE)
         self.screen.blit(restart_text, (self.restart_rect.centerx-restart_text.get_width()//2, self.restart_rect.centery-restart_text.get_height()//2))
+
         # 绘制棋盘格子
         for y in range(board_size):
             for x in range(board_size):
@@ -208,6 +216,17 @@ class Game:
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
+
+                # =========【这里！和QUIT同一缩进】=========
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if self.restart_rect.collidepoint(event.pos):
+                        self.restart_pressed = True
+
+                if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    if self.restart_pressed:
+                        self.restart_pressed = False
+
+                # 鼠标点击处理逻辑
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     click_pos = event.pos
                     if self.state == "start":
@@ -215,8 +234,7 @@ class Game:
                         if btn.collidepoint(click_pos):
                             self.state = "game"
                             self.load_level()
-                    # =========【重点修改：右上角重新开始，不管当前是什么状态都生效！】=========
-                    # 不管是 game / win / lose，点击右上角按钮，统一执行：切回game + 加载关卡
+                    # 右上角重新开始按钮功能逻辑
                     if self.restart_rect.collidepoint(click_pos):
                         self.state = "game"
                         self.load_level()
