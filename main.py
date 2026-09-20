@@ -26,7 +26,7 @@ DIR_VEC = {
     "\u2192": (1, 0)
 }
 
-# ========== 这里是你给的新关卡 ==========
+# ========== 你提供的关卡 ==========
 LEVELS = [
     # 关卡1 4x4
     {
@@ -141,9 +141,9 @@ class Game:
         self.btn_next_level = pygame.transform.scale(self.btn_next_level, (130, 48))
         self.btn_replay = pygame.transform.scale(self.btn_replay, (130, 48))
 
-        # 顶部按钮碰撞区域
-        self.restart_rect = pygame.Rect(520, 8, 140, 40)
-        self.setting_rect = pygame.Rect(370, 8, 120, 40)
+        # ========== 修改：【设置】【重新开始】放到底部居中，不再顶部 ==========
+        self.restart_rect = pygame.Rect(WIDTH//2 + 10, HEIGHT - 60, 140, 40)
+        self.setting_rect = pygame.Rect(WIDTH//2 - 150, HEIGHT - 60, 120, 40)
 
         # 弹窗按钮位置
         self.btn_next_rect = None
@@ -214,6 +214,7 @@ class Game:
         self.screen.blit(info2, (160, 12))
         self.screen.blit(info3, (320, 12))
 
+        # ========== 修改：底部绘制设置、重新开始按钮 ==========
         self.screen.blit(self.btn_setting, self.setting_rect)
         self.screen.blit(self.btn_restart, self.restart_rect)
 
@@ -277,7 +278,12 @@ class Game:
         overlay.fill(BLACK)
         self.screen.blit(overlay, (0, 0))
 
-        box_rect = pygame.Rect(100, 160, 500, 340)
+        # ========== 修改：弹窗尺寸放大，文字在上，4个按钮两行两列放在文字下方 ==========
+        box_w = 540
+        box_h = 420
+        box_x = (WIDTH - box_w)//2
+        box_y = (HEIGHT - box_h)//2
+        box_rect = pygame.Rect(box_x, box_y, box_w, box_h)
         pygame.draw.rect(self.screen, WHITE, box_rect, border_radius=12)
 
         is_all_clear = is_win and (self.current_level_idx == len(LEVELS) - 1)
@@ -292,13 +298,18 @@ class Game:
             title = self.font_big.render("挑战失败", True, RED)
             msg = self.font_mid.render("失误次数耗尽", True, DARK_GRAY)
 
-        self.screen.blit(title, (box_rect.centerx - title.get_width() // 2, box_rect.y + 20))
-        self.screen.blit(msg, (box_rect.centerx - msg.get_width() // 2, box_rect.y + 70))
+        # 绘制标题文字
+        self.screen.blit(title, (box_rect.centerx - title.get_width() // 2, box_rect.y + 30))
+        self.screen.blit(msg, (box_rect.centerx - msg.get_width() // 2, box_rect.y + 80))
 
-        self.btn_next_rect = pygame.Rect(120, box_rect.y + 130, 130, 48)
-        self.btn_replay_rect = pygame.Rect(270, box_rect.y + 130, 130, 48)
-        self.btn_select_rect = pygame.Rect(120, box_rect.y + 200, 130, 48)
-        self.btn_exit_rect = pygame.Rect(270, box_rect.y + 200, 130, 48)
+        # 按钮两行两列，在文字下方
+        btn_w = 130
+        btn_h = 48
+        start_y = box_rect.y + 130
+        self.btn_next_rect   = pygame.Rect(box_x + 40, start_y, btn_w, btn_h)
+        self.btn_replay_rect = pygame.Rect(box_x + box_w - btn_w - 40, start_y, btn_w, btn_h)
+        self.btn_select_rect = pygame.Rect(box_x + 40, start_y + 70, btn_w, btn_h)
+        self.btn_exit_rect   = pygame.Rect(box_x + box_w - btn_w - 40, start_y + 70, btn_w, btn_h)
 
         if is_win and not is_all_clear:
             self.screen.blit(self.btn_next_level, self.btn_next_rect)
@@ -313,21 +324,28 @@ class Game:
         overlay.fill(BLACK)
         self.screen.blit(overlay, (0, 0))
 
-        panel_rect = pygame.Rect(80, 120, 540, 500)
+        # ========== 修改关卡选择弹窗：竖直排版 ==========
+        box_w = 420
+        box_h = 580
+        box_x = (WIDTH - box_w)//2
+        box_y = (HEIGHT - box_h)//2
+        panel_rect = pygame.Rect(box_x, box_y, box_w, box_h)
         pygame.draw.rect(self.screen, WHITE, panel_rect, border_radius=12)
 
+        # 标题在最上方
         title = self.font_big.render("选择关卡", True, DARK_GRAY)
         self.screen.blit(title, (panel_rect.centerx - title.get_width() // 2, panel_rect.y + 20))
 
         self.level_btns = []
-        btn_w = 120
+        btn_w = 140
         btn_h = 60
-        start_x = 110
-        start_y = 100 + 80
+        start_y = panel_rect.y + 90
+        gap_y = 30
 
+        # 关卡按钮竖直向下排列：关卡1，关卡2，关卡3，关卡4，关卡5
         for i in range(len(LEVELS)):
-            bx = start_x + (i % 3) * (btn_w + 20)
-            by = start_y + (i // 3) * (btn_h + 20)
+            bx = panel_rect.centerx - btn_w//2
+            by = start_y + i*(btn_h + gap_y)
             rect = pygame.Rect(bx, by, btn_w, btn_h)
             self.level_btns.append(rect)
 
@@ -340,7 +358,8 @@ class Game:
             txt = self.font_mid.render(f"关卡{i + 1}", True, WHITE)
             self.screen.blit(txt, (rect.centerx - txt.get_width() // 2, rect.centery - txt.get_height() // 2))
 
-        self.btn_back_rect = pygame.Rect(260, 620, 180, 50)
+        # 返回按钮放在最底部
+        self.btn_back_rect = pygame.Rect(panel_rect.centerx - 80, panel_rect.y + box_h - 70, 160, 50)
         self.screen.blit(self.btn_back, self.btn_back_rect)
 
     def run(self):
