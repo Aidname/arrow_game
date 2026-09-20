@@ -1,5 +1,6 @@
 import pygame
 import sys
+import math
 
 # -------------------------- 常量配置 --------------------------
 WIDTH = 700
@@ -13,7 +14,6 @@ GREEN = (30, 180, 60)
 BLUE = (30, 80, 200)
 CELL_SIZE = 80
 MARGIN = 10
-
 # 方向字符和向量
 DIR_VEC = {
     "↑": (0, -1),
@@ -21,7 +21,6 @@ DIR_VEC = {
     "←": (-1, 0),
     "→": (1, 0)
 }
-
 # 关卡（人工试玩，可通关）
 LEVELS = [
     # 关卡1 4x4
@@ -60,7 +59,6 @@ LEVELS = [
         ]
     }
 ]
-
 # -------------------------- 游戏状态 --------------------------
 class Game:
     def __init__(self):
@@ -71,7 +69,6 @@ class Game:
         self.font_big = pygame.font.SysFont("simhei", 48)
         self.font_mid = pygame.font.SysFont("simhei", 28)
         self.font_small = pygame.font.SysFont("simhei", 22)
-
         self.state = "start"  # start / game / win / lose
         self.current_level_idx = 0
         self.mistake_left = 3
@@ -80,6 +77,9 @@ class Game:
         self.anim_timer = 0
         self.anim_type = None  # fly / bump
         self.anim_target = None
+        self.restart_rect = pygame.Rect(520, 8, 140, 36) # 重新开始按钮矩形
+        self.offset_x = 0
+        self.offset_y = 0
 
     def load_level(self):
         """加载当前关卡"""
@@ -92,6 +92,13 @@ class Game:
                 d = lv["map"][y][x]
                 if d != "":
                     self.arrows.append({"x": x, "y": y, "dir": d})
+        self.animating = False
+        self.anim_timer = 0
+        self.anim_type = None
+        self.anim_target = None
+        # 计算棋盘偏移
+        self.offset_x = (WIDTH - size * CELL_SIZE) // 2
+        self.offset_y = 80
 
     def check_block(self, x, y, direction):
         """检测箭头沿方向前进是否有阻挡"""
@@ -117,7 +124,6 @@ class Game:
         self.screen.blit(text1, (WIDTH//2-text1.get_width()//2,220))
         self.screen.blit(text2, (WIDTH//2-text2.get_width()//2,270))
         self.screen.blit(text3, (WIDTH//2-text3.get_width()//2,320))
-
         btn_rect = pygame.Rect(WIDTH//2 - 100, 420, 200, 60)
         pygame.draw.rect(self.screen, BLUE, btn_rect, border_radius=8)
         btn_text = self.font_mid.render("开始游戏", True, WHITE)
@@ -135,29 +141,22 @@ class Game:
         self.screen.blit(info1, (20, 10))
         self.screen.blit(info2, (160, 10))
         self.screen.blit(info3, (320, 10))
-
         # 重新开始按钮
-        restart_rect = pygame.Rect(520, 8, 140, 36)
-        pygame.draw.rect(self.screen, GRAY, restart_rect, border_radius=6)
+        pygame.draw.rect(self.screen, GRAY, self.restart_rect, border_radius=6)
         restart_text = self.font_small.render("重新开始", True, WHITE)
-        self.screen.blit(restart_text, (restart_rect.centerx-restart_text.get_width()//2, restart_rect.centery-restart_text.get_height()//2))
-
-        # 绘制棋盘
-        offset_x = (WIDTH - board_size * CELL_SIZE) // 2
-        offset_y = 80
+        self.screen.blit(restart_text, (self.restart_rect.centerx-restart_text.get_width()//2, self.restart_rect.centery-restart_text.get_height()//2))
+        # 绘制棋盘格子
         for y in range(board_size):
             for x in range(board_size):
-                rect = pygame.Rect(offset_x + x*CELL_SIZE, offset_y + y*CELL_SIZE, CELL_SIZE-MARGIN, CELL_SIZE-MARGIN)
+                rect = pygame.Rect(self.offset_x + x*CELL_SIZE, self.offset_y + y*CELL_SIZE, CELL_SIZE-MARGIN, CELL_SIZE-MARGIN)
                 pygame.draw.rect(self.screen, GRAY, rect, border_radius=4)
-
         # 绘制箭头 + 动画
         for arr in self.arrows:
             ax, ay = arr["x"], arr["y"]
-            rect = pygame.Rect(offset_x + ax*CELL_SIZE, offset_y + ay*CELL_SIZE, CELL_SIZE-MARGIN, CELL_SIZE-MARGIN)
+            rect = pygame.Rect(self.offset_x + ax*CELL_SIZE, self.offset_y + ay*CELL_SIZE, CELL_SIZE-MARGIN, CELL_SIZE-MARGIN)
             color = BLACK
             # 抖动动画
             if self.animating and self.anim_type == "bump" and self.anim_target == arr:
-                import math
                 shake = int(math.sin(self.anim_timer*0.3)*6)
                 rect.x += shake
                 color = RED
@@ -169,7 +168,6 @@ class Game:
                 color = (100,100,100)
             text = self.font_big.render(arr["dir"], True, color)
             self.screen.blit(text, (rect.centerx-text.get_width()//2, rect.centery-text.get_height()//2))
-        return restart_rect, offset_x, offset_y
 
     def draw_modal(self, is_win):
         """通关/失败弹窗"""
@@ -211,51 +209,54 @@ class Game:
                     pygame.quit()
                     sys.exit()
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    click_pos = event.pos
                     if self.state == "start":
                         btn = self.draw_start_screen()
-                        if btn.collidepoint(mouse_pos):
+                        if btn.collidepoint(click_pos):
                             self.state = "game"
                             self.load_level()
-                    elif self.state == "game" and not self.animating:
-                        restart_btn, off_x, off_y = self.draw_game_screen()
-                        if restart_btn.collidepoint(mouse_pos):
-                            self.load_level()
-                            continue
-                        # 点击箭头
-                        lv = LEVELS[self.current_level_idx]
-                        board_size = lv["size"]
-                        for arr in self.arrows:
-                            cx = off_x + arr["x"] * CELL_SIZE
-                            cy = off_y + arr["y"] * CELL_SIZE
-                            rect = pygame.Rect(cx, cy, CELL_SIZE-MARGIN, CELL_SIZE-MARGIN)
-                            if rect.collidepoint(mouse_pos):
-                                # 点击箭头
-                                block = self.check_block(arr["x"], arr["y"], arr["dir"])
-                                if block:
-                                    # 碰撞抖动
-                                    self.animating = True
-                                    self.anim_type = "bump"
-                                    self.anim_target = arr
-                                    self.anim_timer = 0
-                                    self.mistake_left -=1
-                                else:
-                                    # 飞出动画
-                                    self.animating = True
-                                    self.anim_type = "fly"
-                                    self.anim_target = arr
-                                    self.anim_timer = 0
+                    # =========【重点修改：右上角重新开始，不管当前是什么状态都生效！】=========
+                    # 不管是 game / win / lose，点击右上角按钮，统一执行：切回game + 加载关卡
+                    if self.restart_rect.collidepoint(click_pos):
+                        self.state = "game"
+                        self.load_level()
+                        continue
+
+                    if self.state == "game":
+                        # 动画播放时禁止点击箭头
+                        if not self.animating:
+                            lv = LEVELS[self.current_level_idx]
+                            board_size = lv["size"]
+                            for arr in self.arrows:
+                                cx = self.offset_x + arr["x"] * CELL_SIZE
+                                cy = self.offset_y + arr["y"] * CELL_SIZE
+                                rect = pygame.Rect(cx, cy, CELL_SIZE-MARGIN, CELL_SIZE-MARGIN)
+                                if rect.collidepoint(click_pos):
+                                    # 点击箭头
+                                    block = self.check_block(arr["x"], arr["y"], arr["dir"])
+                                    if block:
+                                        # 碰撞抖动
+                                        self.animating = True
+                                        self.anim_type = "bump"
+                                        self.anim_target = arr
+                                        self.anim_timer = 0
+                                        self.mistake_left -=1
+                                    else:
+                                        # 飞出动画
+                                        self.animating = True
+                                        self.anim_type = "fly"
+                                        self.anim_target = arr
+                                        self.anim_timer = 0
                     elif self.state in ("win", "lose"):
                         btn1, btn2 = self.draw_modal(self.state=="win")
-                        if btn2.collidepoint(mouse_pos):
+                        if btn2.collidepoint(click_pos):
                             self.state = "game"
                             self.load_level()
-                        if self.state == "win" and btn1.collidepoint(mouse_pos):
+                        if self.state == "win" and btn1.collidepoint(click_pos):
                             if self.current_level_idx + 1 < len(LEVELS):
                                 self.current_level_idx +=1
                                 self.state = "game"
                                 self.load_level()
-                            else:
-                                print("全部关卡通关")
             # 动画更新
             if self.animating:
                 self.anim_timer += 1
@@ -271,7 +272,6 @@ class Game:
                     # 失误判断
                     if self.mistake_left <= 0:
                         self.state = "lose"
-
             # 绘制逻辑
             if self.state == "start":
                 self.draw_start_screen()
